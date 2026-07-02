@@ -1,5 +1,16 @@
 # Changelog — Lingoready API
 
+## [0.3.0] — 2026-07-02
+
+### Added
+- **Catalog ×5:** seed expanded to 10 paths / ~125 scenarios (negotiation, client calls, difficult conversations, leadership, networking, career growth added).
+- `POST /scenarios/custom` — AI-drafted user scenarios (structured LLM output, per-user, never plan-locked) + `DELETE /scenarios/:slug`.
+- Session options on `POST /sessions`: `duration_minutes` (5/10/15 → per-session cap) and `difficulty` (easy/realistic/hard → coach behavior in the system prompt).
+- `POST /sessions/:id/hint` — one whisper-phrase suggestion from the turn model.
+- `GET /config` — remote feature flags + minimum app version (env-overridable).
+- `drills/score` accepts `kind: generic` (group-room turns).
+- Migration 0002: `scenarios.user_id`, `sessions.difficulty`, `sessions.max_seconds`.
+
 ## [0.2.0] — 2026-07-02
 
 ### Added

@@ -58,21 +58,47 @@ assessment is scored and `done: true` includes the result.
 ## Scenarios
 
 ### `GET /scenarios`
-Full catalog. Each item includes `path_slug`, `order_in_path`, `difficulty`,
-`estimated_minutes`, `coach_name`, `win_conditions`, `key_phrases` and
-`locked` (computed from the user's plan).
+Full catalog (10 paths, ~125 lessons) **plus the user's custom scenarios**.
+Each item includes `path_slug`, `order_in_path`, `difficulty`,
+`estimated_minutes`, `coach_name`, `win_conditions`, `key_phrases`,
+`is_custom` and `locked` (computed from the user's plan; custom scenarios
+are never locked).
 
 ### `GET /scenarios/:slug`
 Single scenario (brief screen).
+
+### `POST /scenarios/custom`
+AI-drafted scenario from a free-text description — the anti-repetition
+feature ("practice MY meeting tomorrow").
+```json
+{ "description": "Tomorrow I present our Q3 roadmap to leadership. My VP interrupts a lot…" }
+```
+→ `201` with the full scenario object (`path_slug: "custom"`). One
+`LLM_FEEDBACK_MODEL` call, metered.
+
+### `DELETE /scenarios/:slug`
+Deletes one of the user's custom scenarios.
 
 ## Practice sessions
 
 ### `POST /sessions`
 ```json
-{ "scenario_slug": "interviews-10-system-design-interview", "mode": "voice" }
+{
+  "scenario_slug": "interviews-13-system-design-interview",
+  "mode": "voice",
+  "duration_minutes": 10,
+  "difficulty": "realistic"
+}
 ```
 → `201 { "session_id": "…", "ws_path": "/v1/sessions/<id>/live" }`
-Fails with `402 plan_limit` when the monthly speaking cap is used up.
+
+- `duration_minutes` (5 | 10 | 15, optional) — per-session hard cap, bounded by the server cap.
+- `difficulty` (`easy` | `realistic` | `hard`, default `realistic`) — adjusts coach pace, vocabulary and pushback.
+- Fails with `402 plan_limit` when the monthly speaking cap is used up.
+
+### `POST /sessions/:id/hint`
+One whisper-phrase the learner could say next (cheap turn-model call).
+→ `{ "hint": "\"Let me make sure I understand the constraint…\"" }`
 
 ### WebSocket `/v1/sessions/:id/live`
 
@@ -159,6 +185,15 @@ Scores one drill round with STT + deterministic speech metrics (no LLM cost).
 
 ### `GET /progress`
 `{ "cefr_level", "goal", "streak_days", "daily_minutes": [{ "day", "minutes" }], "skills": { … } }`
+
+## Remote config
+
+### `GET /config` (no auth)
+Feature flags + minimum supported app version. Flags override via the
+`FEATURE_FLAGS` env var (JSON).
+```json
+{ "min_app_version": "0.1.0", "features": { "custom_scenarios": true, "hands_free_vad": true, "…": true } }
+```
 
 ## Webhooks (server-to-server)
 
