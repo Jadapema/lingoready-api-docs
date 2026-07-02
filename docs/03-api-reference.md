@@ -195,6 +195,25 @@ Feature flags + minimum supported app version. Flags override via the
 { "min_app_version": "0.1.0", "features": { "custom_scenarios": true, "hands_free_vad": true, "…": true } }
 ```
 
+## Admin (backoffice)
+
+All `/admin/*` routes require the **admin** role (bootstrap via the
+`ADMIN_EMAILS` env allowlist — matching accounts are promoted on sign-in).
+Non-admins receive `403 forbidden`. Consumed by
+[lingoready-backoffice](https://github.com/Jadapema/lingoready-backoffice).
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /admin/overview` | KPIs: users (total/new 7d/pending deletion), sessions (today/7d/minutes), AI spend (today/7d/30d), plan distribution, avg session score |
+| `GET /admin/users?query=&page=` | Search/paginate users with plan, sessions count, lifetime spend |
+| `GET /admin/users/:id` | Full detail: profile, recent sessions, spend by pipeline stage |
+| `PATCH /admin/users/:id` | Change `plan`/`minute_cap`, grant/revoke `role`, `restore` soft-deleted accounts |
+| `GET /admin/sessions?status=&page=` | Session monitor with user, scenario, difficulty, duration, score |
+| `GET /admin/usage` | Daily cost by stage (30d) + top-10 spenders |
+| `GET/POST /admin/scenarios` · `PATCH/DELETE /admin/scenarios/:id` | Catalog CRUD (delete blocked once a scenario has sessions) |
+| `GET /admin/feedback?page=` | Recent coach reports for prompt-quality review |
+| `GET /admin/settings` · `PUT /admin/settings/:key` | Editable runtime settings; `feature_flags` and `min_app_version` are served by `GET /config` |
+
 ## Webhooks (server-to-server)
 
 ### `POST /webhooks/revenuecat`

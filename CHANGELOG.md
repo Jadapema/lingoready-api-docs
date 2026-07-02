@@ -1,5 +1,11 @@
 # Changelog — Lingoready API
 
+## [0.4.0] — 2026-07-02
+
+### Added
+- **Admin surface** for the backoffice: role-based access (`users.role`, `ADMIN_EMAILS` bootstrap, `requireAdmin` guard) and `/admin/*` endpoints — overview KPIs, user management (plans/caps/roles/restore), session monitor, usage & cost reporting, scenario catalog CRUD, feedback review, editable runtime settings.
+- `app_settings` table; `GET /config` now merges backoffice settings > env > defaults (migration 0003).
+
 ## [0.3.0] — 2026-07-02
 
 ### Added
