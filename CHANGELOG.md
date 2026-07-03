@@ -1,5 +1,14 @@
 # Changelog — Lingoready API
 
+## [0.7.0] — 2026-07-03
+
+### Added
+- **Live PCM streaming** on the session WebSocket: `turn_start` now sets the turn's audio format and pre-opens the STT connection; raw `audio/pcm;rate=16000` streams to Deepgram as linear16 while the user is still speaking (WAV-wrapped automatically for the batch STT fallback). `transcript_final` lands near-instantly after `audio_end`.
+- **Coach voices** (migration 0005): `scenarios.coach_voice` — each coach speaks with its own TTS voice, editable in the backoffice catalog and returned by `GET /scenarios`; per-user `tts_voice` preference on `GET/PATCH /me` overrides it.
+
+### Changed
+- Streaming-turn latency: per-clause TTS synthesizes in parallel with ordered delivery (a failed clause sends an empty frame instead of stalling the client), the first clause splits eagerly at a comma, the session row is prefetched during STT finalization, prompt reads are batched, and usage metering no longer blocks frames to the client.
+
 ## [0.6.0] — 2026-07-03
 
 ### Added

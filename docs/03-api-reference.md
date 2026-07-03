@@ -19,6 +19,7 @@ Current profile, plan and usage.
   "id": "…", "email": "…", "name": "…",
   "cefr_level": "B1", "goal": "interview", "profession": "software",
   "ui_language": "es", "daily_goal_minutes": 15, "voice_retention": false,
+  "tts_voice": null,
   "reminder_time": "09:30",
   "plan": "free", "monthly_minute_cap": 20, "monthly_minutes_used": 12
 }
@@ -28,7 +29,9 @@ Current profile, plan and usage.
 Any subset of: `name`, `country`, `native_language`, `ui_language`,
 `goal` (`interview|meetings|writing|job`),
 `profession` (`software|product|marketing|finance|sales|health|academic|generic`),
-`daily_goal_minutes` (5–60), `voice_retention`, `reminder_time` (`HH:MM`),
+`daily_goal_minutes` (5–60), `voice_retention`,
+`tts_voice` (a supported TTS voice, or `null` to use each coach's own),
+`reminder_time` (`HH:MM`),
 `fcm_token` (for push — the worker sends a "your report is ready" push via FCM
 when session feedback finishes; dead tokens are cleared automatically).
 
@@ -66,9 +69,10 @@ assessment is scored and `done: true` includes the result.
 ### `GET /scenarios`
 Full catalog (10 paths, ~125 lessons) **plus the user's custom scenarios**.
 Each item includes `path_slug`, `order_in_path`, `difficulty`,
-`estimated_minutes`, `coach_name`, `win_conditions`, `key_phrases`,
-`is_custom` and `locked` (computed from the user's plan; custom scenarios
-are never locked).
+`estimated_minutes`, `coach_name`, `coach_voice` (the TTS voice this coach
+speaks with; editable in the backoffice catalog), `win_conditions`,
+`key_phrases`, `is_custom` and `locked` (computed from the user's plan;
+custom scenarios are never locked).
 
 ### `GET /scenarios/:slug`
 Single scenario (brief screen).
@@ -112,9 +116,9 @@ One whisper-phrase the learner could say next (cheap turn-model call).
 | --- | --- | --- |
 | → | `{ "type": "auth", "token": "<Firebase ID token>" }` | must be first |
 | ← | `{ "type": "ready" }` | authenticated |
-| → | `{ "type": "turn_start", "mime_type": "audio/m4a" }` | optional — pre-opens the STT connection while the user speaks |
-| → | binary frames | audio chunks for the current turn (streamed to STT live when Deepgram is configured) |
-| → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | end of turn |
+| → | `{ "type": "turn_start", "mime_type": "audio/pcm;rate=16000" }` | recommended — sets the turn's audio format and pre-opens the STT connection while the user speaks |
+| → | binary frames | audio chunks for the current turn — raw 16 kHz mono 16-bit PCM streamed live while speaking (preferred), or a container format (m4a/wav/ogg) uploaded at turn end |
+| → | `{ "type": "audio_end", "mime_type": "audio/pcm;rate=16000" }` | end of turn |
 | ← | `{ "type": "transcript_partial", "text": "…" }` | live STT partials (Deepgram only) |
 | ← | `{ "type": "transcript_final", "text": "…" }` | your words |
 | ← | `{ "type": "assistant_delta", "text": "…" }` | LLM tokens as they stream |

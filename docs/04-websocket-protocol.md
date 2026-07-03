@@ -17,8 +17,8 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 
 | # | Direction | Frame | Notes |
 | --- | --- | --- | --- |
-| 0 | → | `{ "type": "turn_start", "mime_type": "audio/m4a" }` | Optional but recommended: send when recording starts so the server pre-opens the STT connection off the critical path |
-| 1 | → | binary frames (≤256 KB each) | Audio chunks. With Deepgram configured they stream to STT live |
+| 0 | → | `{ "type": "turn_start", "mime_type": "audio/pcm;rate=16000" }` | Recommended: send when recording starts. Sets the turn's audio format and pre-opens the STT connection off the critical path |
+| 1 | → | binary frames (≤256 KB each) | Audio chunks. Preferred: raw 16 kHz mono 16-bit PCM streamed **while the user speaks** (the reference app does this) — STT transcribes in real time and `transcript_final` is near-instant after `audio_end`. Container formats (m4a/wav/ogg) uploaded at turn end also work |
 | 2 | ← | `{ "type": "transcript_partial", "text" }` | Live captions (Deepgram only), repeated |
 | 3 | → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | Closes the user's turn |
 | 4 | ← | `{ "type": "transcript_final", "text" }` | Empty text = nothing intelligible; turn aborts quietly |
@@ -38,7 +38,7 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 ## Client obligations
 
 1. Send `auth` first; wait for `ready` before audio.
-2. Send `turn_start` when the mic opens — it shaves the STT handshake (~300 ms) off the reply time.
+2. Send `turn_start` when the mic opens — it sets the turn's audio format and shaves the STT handshake (~300 ms) off the reply time. Raw PCM (`audio/pcm;rate=16000`) requires it before the first binary frame.
 3. Chunk uploads ≤256 KB (server frame limit 2 MB).
 4. Play `assistant_audio` strictly in `seq` order; any frame with empty audio (skipped synth or `last: true` end-marker) must still advance the sequence.
 5. On disconnect: reconnect with backoff and re-auth — server-side session state survives (context lives in Postgres). The reference client queues one pending turn while offline.
@@ -46,4 +46,4 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 
 ## Timing expectations
 
-With Deepgram configured, `transcript_final` typically lands <300 ms after `audio_end`, and the first `assistant_audio` ~0.6–1.2 s later. With batch fallback, add 0.8–2 s for transcription. See [AI Pipeline](06-ai-pipeline.md) for the full budget.
+With Deepgram configured **and live PCM streaming** (audio transcribed while the user speaks), `transcript_final` typically lands <150 ms after `audio_end`, and the first `assistant_audio` ~0.6–1.2 s later. With end-of-turn uploads add the upload + transcription time; with batch fallback add 0.8–2 s. See [AI Pipeline](06-ai-pipeline.md) for the full budget.

@@ -14,8 +14,10 @@ _Last updated: 2026-07-02_
 | Scenario catalog (38 scenarios, 4 paths) | ✅ Done | Seed script; plan-based locking |
 | Live voice sessions (WS) | ✅ Done | Streaming protocol below |
 | — LLM reply streaming (`assistant_delta`) | ✅ Done | gpt-4o-mini |
-| — Per-sentence TTS chunks (`assistant_audio` seq) | ✅ Done | Coach speaks after the first sentence |
+| — Per-clause TTS chunks (`assistant_audio` seq) | ✅ Done | Parallel synth, ordered delivery; coach speaks after the first clause |
 | — Live STT partials | 🔑 Config-gated | `DEEPGRAM_API_KEY`; batch fallback otherwise |
+| — Live PCM streaming (`audio/pcm;rate=16000`) | ✅ Done | Transcribed while the user speaks; WAV-wrap for batch fallback |
+| — Coach voices (`coach_voice` / user `tts_voice`) | ✅ Done | Backoffice catalog + user preference |
 | — Barge-in handling | ✅ Done | Stops TTS queuing server-side |
 | Chat-mode turns (REST) | ✅ Done | Same session/transcript |
 | Post-session feedback (queued worker) | ✅ Done | GPT-4o, strict JSON schema, 2 fixes |

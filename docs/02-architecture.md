@@ -24,8 +24,9 @@ src/
 ## The streaming turn (core loop)
 
 ```
-turn_start ──► SttStream pre-opened (handshake off the critical path)
-binary audio ──► SttStream (Deepgram live │ batch fallback)
+turn_start ──► SttStream pre-opened (handshake off the critical path;
+               sets the turn mime — raw PCM streams as linear16)
+binary audio ──► SttStream (Deepgram live │ batch fallback wraps PCM in WAV)
                      │ partials → transcript_partial
 audio_end ──► finish() → transcript_final
                      │        (session row prefetched in parallel)
@@ -46,6 +47,7 @@ Key properties:
 - **The coach starts speaking after the first clause**, not the full reply — the assembler emits the opening clause at a comma once ~24 chars have buffered, then whole sentences.
 - Sentence TTS **synthesizes in parallel** but delivery is chained, so chunks arrive in `seq` order; a failed synth sends an empty frame so the client's AudioQueue never stalls.
 - Usage metering (`recordUsage`) is fire-and-forget — it never sits between the pipeline and a frame heading to the client.
+- Each coach speaks with its scenario's `coach_voice`; a user's `tts_voice` preference overrides it (resolved once at socket auth).
 - **Barge-in** sets a flag that stops queuing further TTS for the current reply.
 - Turn handling is guarded: duplicate `audio_end` while busy is dropped; >10 turns/min → `rate_limited` error frame.
 
