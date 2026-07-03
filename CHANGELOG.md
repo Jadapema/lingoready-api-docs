@@ -1,5 +1,20 @@
 # Changelog — Lingoready API
 
+## [0.6.0] — 2026-07-03
+
+### Added
+- `GET /me/export` — full account data export (profile, sessions with turns & feedback, assessments, words, writing reviews); 3 req/hour rate limit.
+- **Drill catalog in the DB** (migration 0004): `GET /drills` for the app, `GET/POST/PATCH/DELETE /admin/drills` for the backoffice, seeded with the 17-drill launch set.
+- **Server-sent push notifications** (FCM via firebase-admin): the worker pushes "your session report is ready" when feedback generation completes; dead tokens are cleared automatically.
+
+### Fixed
+- `POST /drills/score` accepted only 7 `kind` values, so 11 of the 17 launch drills failed with 400 — any drill slug is now accepted, falling back to generic metrics.
+
+## [0.5.0] — 2026-07-02
+
+### Added
+- `POST /tts/preview` — short TTS clips for the app's "Hear David's voice" / "Hear the room" buttons. In-memory LRU cache (normalized text + voice), 10 req/min per-route rate limit, optional `voice` override (defaults to `TTS_VOICE`).
+
 ## [0.4.0] — 2026-07-02
 
 ### Added

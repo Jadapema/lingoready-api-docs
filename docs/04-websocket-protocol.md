@@ -17,12 +17,13 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 
 | # | Direction | Frame | Notes |
 | --- | --- | --- | --- |
+| 0 | → | `{ "type": "turn_start", "mime_type": "audio/m4a" }` | Optional but recommended: send when recording starts so the server pre-opens the STT connection off the critical path |
 | 1 | → | binary frames (≤256 KB each) | Audio chunks. With Deepgram configured they stream to STT live |
 | 2 | ← | `{ "type": "transcript_partial", "text" }` | Live captions (Deepgram only), repeated |
 | 3 | → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | Closes the user's turn |
 | 4 | ← | `{ "type": "transcript_final", "text" }` | Empty text = nothing intelligible; turn aborts quietly |
 | 5 | ← | `{ "type": "assistant_delta", "text" }` | LLM tokens, repeated — render as "coach is speaking" |
-| 6 | ← | `{ "type": "assistant_audio", "seq": n, "last": bool, "audio_base64", "mime_type": "audio/mpeg" }` | One frame **per sentence**, ordered by `seq`; play as they arrive |
+| 6 | ← | `{ "type": "assistant_audio", "seq": n, "last": bool, "audio_base64", "mime_type": "audio/mpeg" }` | One frame **per clause/sentence**, ordered by `seq`; sentences synthesize in parallel server-side but always arrive in order. An empty `audio_base64` means that `seq` was skipped (failed synth or end-marker) — advance past it |
 | 7 | ← | `{ "type": "assistant_text", "text" }` | Full reply; turn is closed and persisted |
 
 ## Control frames
@@ -37,10 +38,11 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 ## Client obligations
 
 1. Send `auth` first; wait for `ready` before audio.
-2. Chunk uploads ≤256 KB (server frame limit 2 MB).
-3. Play `assistant_audio` strictly in `seq` order; a frame with `last: true` and empty audio is an end-marker only.
-4. On disconnect: reconnect with backoff and re-auth — server-side session state survives (context lives in Postgres). The reference client queues one pending turn while offline.
-5. Call `POST /v1/sessions/:id/end` after closing to trigger feedback generation.
+2. Send `turn_start` when the mic opens — it shaves the STT handshake (~300 ms) off the reply time.
+3. Chunk uploads ≤256 KB (server frame limit 2 MB).
+4. Play `assistant_audio` strictly in `seq` order; any frame with empty audio (skipped synth or `last: true` end-marker) must still advance the sequence.
+5. On disconnect: reconnect with backoff and re-auth — server-side session state survives (context lives in Postgres). The reference client queues one pending turn while offline.
+6. Call `POST /v1/sessions/:id/end` after closing to trigger feedback generation.
 
 ## Timing expectations
 

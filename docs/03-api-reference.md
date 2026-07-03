@@ -29,7 +29,13 @@ Any subset of: `name`, `country`, `native_language`, `ui_language`,
 `goal` (`interview|meetings|writing|job`),
 `profession` (`software|product|marketing|finance|sales|health|academic|generic`),
 `daily_goal_minutes` (5–60), `voice_retention`, `reminder_time` (`HH:MM`),
-`fcm_token` (for push).
+`fcm_token` (for push — the worker sends a "your report is ready" push via FCM
+when session feedback finishes; dead tokens are cleared automatically).
+
+### `GET /me/export`
+Full data export (GDPR right of access): profile, subscription, every session
+with turns and feedback, assessments, word bank, writing reviews. Rate-limited
+to 3 requests/hour. The app offers it under Profile → "Export my data".
 
 ### `DELETE /me`
 Soft-deletes the account (30-day purge window).
@@ -106,12 +112,13 @@ One whisper-phrase the learner could say next (cheap turn-model call).
 | --- | --- | --- |
 | → | `{ "type": "auth", "token": "<Firebase ID token>" }` | must be first |
 | ← | `{ "type": "ready" }` | authenticated |
+| → | `{ "type": "turn_start", "mime_type": "audio/m4a" }` | optional — pre-opens the STT connection while the user speaks |
 | → | binary frames | audio chunks for the current turn (streamed to STT live when Deepgram is configured) |
 | → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | end of turn |
 | ← | `{ "type": "transcript_partial", "text": "…" }` | live STT partials (Deepgram only) |
 | ← | `{ "type": "transcript_final", "text": "…" }` | your words |
 | ← | `{ "type": "assistant_delta", "text": "…" }` | LLM tokens as they stream |
-| ← | `{ "type": "assistant_audio", "seq": 0, "last": false, "audio_base64": "…", "mime_type": "audio/mpeg" }` | per-sentence TTS — play in `seq` order as chunks arrive |
+| ← | `{ "type": "assistant_audio", "seq": 0, "last": false, "audio_base64": "…", "mime_type": "audio/mpeg" }` | per-clause TTS (parallel synth, ordered delivery) — play in `seq` order; empty `audio_base64` = skip that `seq` |
 | ← | `{ "type": "assistant_text", "text": "…" }` | full reply (turn closed) |
 | → | `{ "type": "barge_in" }` | user interrupted — server stops queuing TTS for this reply |
 | → | `{ "type": "end" }` | close |
@@ -165,11 +172,23 @@ Marks the session done and enqueues feedback. → `{ "status": "processing" }`
 
 ## Drills
 
+### `GET /drills`
+Active drill catalog, ordered. Seeded with the 17-drill launch set and
+editable from the backoffice — drills ship without an app release (the app
+bundles a fallback copy for offline/first launch).
+```json
+{ "drills": [{ "id": "filler", "emoji": "🗣️", "title": "Filler words", "min": "2 min",
+  "goal": "…", "rounds": 3, "tip": "…", "prompts": ["…"], "summary": "…", "kind": "filler" }] }
+```
+`kind` is the metric profile the app passes to `POST /drills/score`.
+
 ### `POST /drills/score`
 Scores one drill round with STT + deterministic speech metrics (no LLM cost).
 ```json
 { "audio_base64": "…", "mime_type": "audio/m4a", "kind": "filler", "reference_text": "optional sentence" }
 ```
+`kind` accepts any drill slug; kinds without a dedicated metric profile fall
+back to generic coaching.
 →
 ```json
 {
@@ -185,6 +204,20 @@ Scores one drill round with STT + deterministic speech metrics (no LLM cost).
 
 ### `GET /progress`
 `{ "cefr_level", "goal", "streak_days", "daily_minutes": [{ "day", "minutes" }], "skills": { … } }`
+
+## Voice preview
+
+### `POST /tts/preview`
+Short TTS clip for the "Hear David's voice" / "Hear the room" buttons on the
+scenario brief and group lobby. Responses are cached in-memory (LRU, keyed by
+normalized text + voice), and the route is rate-limited to 10/min per user.
+```json
+{ "text": "We'll design a URL shortener together…", "voice": "alloy" }
+```
+→ `{ "audio_base64": "…", "mime_type": "audio/mpeg" }`
+
+`text` is 3–300 chars; `voice` is optional (defaults to `TTS_VOICE`, one of
+the OpenAI TTS voices).
 
 ## Remote config
 
@@ -211,6 +244,7 @@ Non-admins receive `403 forbidden`. Consumed by
 | `GET /admin/sessions?status=&page=` | Session monitor with user, scenario, difficulty, duration, score |
 | `GET /admin/usage` | Daily cost by stage (30d) + top-10 spenders |
 | `GET/POST /admin/scenarios` · `PATCH/DELETE /admin/scenarios/:id` | Catalog CRUD (delete blocked once a scenario has sessions) |
+| `GET/POST /admin/drills` · `PATCH/DELETE /admin/drills/:id` | Quick-drill catalog CRUD (served to the app by `GET /drills`) |
 | `GET /admin/feedback?page=` | Recent coach reports for prompt-quality review |
 | `GET /admin/settings` · `PUT /admin/settings/:key` | Editable runtime settings; `feature_flags` and `min_app_version` are served by `GET /config` |
 
