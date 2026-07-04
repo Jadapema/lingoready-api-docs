@@ -21,6 +21,7 @@ Current profile, plan and usage.
   "ui_language": "es", "daily_goal_minutes": 15, "voice_retention": false,
   "tts_voice": null,
   "reminder_time": "09:30",
+  "persona_overrides": { "Ana": { "name": "María", "role": "my boss", "voice": "coral" } },
   "plan": "free", "monthly_minute_cap": 20, "monthly_minutes_used": 12
 }
 ```
@@ -33,7 +34,12 @@ Any subset of: `name`, `country`, `native_language`, `ui_language`,
 `tts_voice` (a supported TTS voice, or `null` to use each coach's own),
 `reminder_time` (`HH:MM`),
 `fcm_token` (for push — the worker sends a "your report is ready" push via FCM
-when session feedback finishes; dead tokens are cleared automatically).
+when session feedback finishes; dead tokens are cleared automatically),
+`persona_overrides` (full-replacement map keyed by the catalog coach's
+canonical name, e.g. `"Ana"`; each entry may set `name`, `role` and/or `voice`.
+Live sessions role-play with that identity — the system prompt is rewritten —
+and speak with that voice. Voice precedence: persona override → user
+`tts_voice` → the scenario's `coach_voice` → `TTS_VOICE` env default).
 
 ### `GET /me/export`
 Full data export (GDPR right of access): profile, subscription, every session
@@ -122,7 +128,7 @@ One whisper-phrase the learner could say next (cheap turn-model call).
 | ← | `{ "type": "transcript_partial", "text": "…" }` | live STT partials (Deepgram only) |
 | ← | `{ "type": "transcript_final", "text": "…" }` | your words |
 | ← | `{ "type": "assistant_delta", "text": "…" }` | LLM tokens as they stream |
-| ← | `{ "type": "assistant_audio", "seq": 0, "last": false, "audio_base64": "…", "mime_type": "audio/mpeg" }` | per-clause TTS (parallel synth, ordered delivery) — play in `seq` order; empty `audio_base64` = skip that `seq` |
+| ← | `{ "type": "assistant_audio", "seq": 0, "last": false, "audio_base64": "…", "mime_type": "audio/mpeg", "text": "…" }` | per-clause TTS (parallel synth, ordered delivery) — play in `seq` order; `text` is the sentence spoken (drives voice-synced captions); empty `audio_base64` = skip that `seq` |
 | ← | `{ "type": "assistant_text", "text": "…" }` | full reply (turn closed) |
 | → | `{ "type": "barge_in" }` | user interrupted — server stops queuing TTS for this reply |
 | → | `{ "type": "end" }` | close |
@@ -154,6 +160,9 @@ Marks the session done and enqueues feedback. → `{ "status": "processing" }`
   }
 }
 ```
+All scores are on a 0–100 scale (the worker normalizes model output).
+`suggested_words` are also saved to the user's word bank automatically
+(`source: "session"`, deduplicated case-insensitively).
 
 ### `GET /sessions` — recent history (Progress screen)
 
@@ -163,9 +172,15 @@ Marks the session done and enqueues feedback. → `{ "status": "processing" }`
 ```json
 { "text": "Hi, sorry to bother…", "channel": "slack", "tone": "friendly" }
 ```
-→ `{ "rewrite": "…", "changes": [{ "tag": "Grammar", "before": "…", "after": "…", "why": "…" }] }`
+`channel`: `slack|email|pr_review|proposal|linkedin|support` ·
+`tone`: `friendly|formal|direct|concise|diplomatic|persuasive`
+→ `{ "rewrite": "…", "score": 62, "strengths": ["…"], "changes": [{ "tag": "Grammar", "before": "…", "after": "…", "why": "…" }] }`
+`score` grades the ORIGINAL draft 0–100; `why` explanations and `strengths`
+come back in the user's UI language so learners fully understand the fixes.
 
 ### `GET /writing/history`
+Last 20 reviews (`id`, `channel`, `tone`, `input_text`, `rewrite`, `changes`,
+`score`, `created_at`).
 
 ## Word bank
 

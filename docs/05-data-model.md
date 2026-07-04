@@ -6,14 +6,14 @@ PostgreSQL via Drizzle ORM. Conventions: UUID PKs, `created_at`/`updated_at` eve
 
 | Table | Purpose | Notable fields |
 | --- | --- | --- |
-| `users` | Profile + preferences | `firebase_uid` (unique), `cefr_level`, `goal`, `profession`, `daily_goal_minutes`, `voice_retention`, `fcm_token`, `reminder_time`, `deleted_at` (soft delete) |
+| `users` | Profile + preferences | `firebase_uid` (unique), `cefr_level`, `goal`, `profession`, `daily_goal_minutes`, `voice_retention`, `tts_voice`, `persona_overrides` JSONB (coach name→{name,role,voice} customization), `fcm_token`, `reminder_time`, `deleted_at` (soft delete) |
 | `subscriptions` | Plan + entitlements | `plan` (free/standard/pro), `provider`, `monthly_minute_cap` (0 = unlimited), `current_period_end` |
-| `scenarios` | Practice catalog | `slug`, `path_slug` + `order_in_path`, `difficulty`, `role_prompt`, `win_conditions[]`, `key_phrases[]`, `coach_name/role`, `is_free` |
+| `scenarios` | Practice catalog | `slug`, `path_slug` + `order_in_path`, `difficulty`, `role_prompt`, `win_conditions[]`, `key_phrases[]`, `coach_name/role/voice` (voice matches the coach's persona), `is_free` |
 | `sessions` | One practice run | `kind` (scenario/drill/group), `mode` (voice/chat), `status` (created→live→processing→done), `duration_seconds` |
 | `turns` | Transcript lines | `role` (user/assistant), `text`, `audio_url` (ephemeral), `ts` |
 | `feedback` | Post-session report | `overall_score`, `scores` JSONB, `fixes[]` (said/better/tag/why), `did_well[]`, `suggested_words[]`, `model` |
 | `assessments` | Level checks | `answers[]`, `cefr_estimate`, `breakdown` JSONB, `takeaways[]` |
-| `writing_reviews` | Writing coach history | `channel`, `tone`, `input_text`, `rewrite`, `changes[]`, `tokens_used` |
+| `writing_reviews` | Writing coach history | `channel`, `tone`, `input_text`, `rewrite`, `changes[]`, `score` (original draft, 0–100), `tokens_used` |
 | `words` | Personal word bank | `word`, `note`, `example`, `mastered`, `seen_count`, `source` (manual/session) |
 | `usage_events` | Cost metering | `type` (stt/llm/tts/pron), `provider`, `units`, `cost_usd`, indexed `(user_id, ts)` |
 | `progress_weekly` | Rollups for fast reads | `active_minutes`, `sessions_count`, `level_snapshot`, `skill_snapshot` |

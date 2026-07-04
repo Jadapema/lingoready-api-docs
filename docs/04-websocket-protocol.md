@@ -23,7 +23,7 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 | 3 | → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | Closes the user's turn |
 | 4 | ← | `{ "type": "transcript_final", "text" }` | Empty text = nothing intelligible; turn aborts quietly |
 | 5 | ← | `{ "type": "assistant_delta", "text" }` | LLM tokens, repeated — render as "coach is speaking" |
-| 6 | ← | `{ "type": "assistant_audio", "seq": n, "last": bool, "audio_base64", "mime_type": "audio/mpeg" }` | One frame **per clause/sentence**, ordered by `seq`; sentences synthesize in parallel server-side but always arrive in order. An empty `audio_base64` means that `seq` was skipped (failed synth or end-marker) — advance past it |
+| 6 | ← | `{ "type": "assistant_audio", "seq": n, "last": bool, "audio_base64", "mime_type": "audio/mpeg", "text": "…" }` | One frame **per clause/sentence**, ordered by `seq`; sentences synthesize in parallel server-side but always arrive in order. `text` carries the sentence being spoken so the client can grow captions in sync with the voice. An empty `audio_base64` means that `seq` was skipped (failed synth or end-marker) — advance past it |
 | 7 | ← | `{ "type": "assistant_text", "text" }` | Full reply; turn is closed and persisted |
 
 ## Control frames
