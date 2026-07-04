@@ -160,8 +160,11 @@ Marks the session done and enqueues feedback. → `{ "status": "processing" }`
   }
 }
 ```
-All scores are on a 0–100 scale (the worker normalizes model output).
-`suggested_words` are also saved to the user's word bank automatically
+All scores are on a 0–100 scale (the worker normalizes model output) and are
+calibrated against evidence — the prompt receives the learner's turn count and
+word total, and a session with under ~40 spoken words is capped below 45
+server-side. `suggested_words` are topic-specific to the transcript, exclude
+words already in the user's word bank, and are saved to it automatically
 (`source: "session"`, deduplicated case-insensitively).
 
 ### `GET /sessions` — recent history (Progress screen)
@@ -186,6 +189,10 @@ Last 20 reviews (`id`, `channel`, `tone`, `input_text`, `rewrite`, `changes`,
 
 - `GET /words` — list
 - `POST /words` — `{ "word": "…", "note"?, "example"?, "source"? }`
+- `POST /words/lookup` — `{ "word": "…", "context"? }` → `{ "word", "definition", "translation", "example" }`.
+  Quick in-session dictionary (tap a caption word in the app): definition and
+  translation come back in the user's UI language, the example stays in
+  English. Rate-limited to 20/min.
 - `PATCH /words/:id` — `{ "mastered"?: bool, "note"?: string }`
 - `DELETE /words/:id`
 
