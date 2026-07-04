@@ -1,5 +1,12 @@
 # Changelog — Lingoready API
 
+## [0.9.0] — 2026-07-04
+
+### Added
+- **Group rooms are now real multi-agent conversations.** `POST /group-sessions` + WebSocket `/v1/group-sessions/:id/live`: each of the 10 rooms has three AI participants with their own persona, role and TTS voice (user persona-voice overrides apply). A deterministic beat plan guarantees the learner's speaking turns (host opens → agents react and hand the floor → learner → reactions to what the learner **actually said** → host wraps), while every agent line is generated live against the real transcript. Agent frames carry `speaker` + `turn`; `seq` is session-global so client audio queues never reset between speakers. See the [group protocol](/docs/04-websocket-protocol).
+- Migration 0008: `turns.speaker` (which agent spoke) and `sessions.group_room_id`.
+- Group sessions reuse `POST /sessions/:id/end` + `GET /sessions/:id/feedback` — the feedback worker now labels each agent by name in the graded transcript, and `GET /sessions` resolves group titles/emojis from the room catalog.
+
 ## [0.7.0] — 2026-07-03
 
 ### Added

@@ -168,6 +168,23 @@ words already in the user's word bank, and are saved to it automatically
 (`source: "session"`, deduplicated case-insensitively).
 
 ### `GET /sessions` — recent history (Progress screen)
+Group sessions appear with the room's title and emoji resolved from the room catalog.
+
+## Group rooms
+
+Multi-agent practice: every room has three AI participants with their own
+persona, role and TTS voice, orchestrated server-side. See the
+[group protocol](04-websocket-protocol.md#group-rooms--multi-agent-v1group-sessionsidlive).
+
+### `POST /group-sessions`
+```json
+{ "room_id": "standup", "difficulty": "realistic" }
+```
+→ `201 { "session_id": "…", "ws_path": "/v1/group-sessions/<id>/live" }`
+
+- `room_id` — one of the 10 catalog rooms (`standup`, `panel`, `client`, `debate`, `brainstorm`, `retro`, `allhands`, `demo`, `postmortem`, `mixer`).
+- Accepts the same `Idempotency-Key` header and `402 plan_limit` rules as `POST /sessions`.
+- Group sessions reuse the regular session endpoints: `POST /sessions/:id/end` and `GET /sessions/:id/feedback` produce the standard report (agents labeled by name in the graded transcript).
 
 ## Writing coach
 

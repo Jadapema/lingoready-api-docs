@@ -47,3 +47,34 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 ## Timing expectations
 
 With Deepgram configured **and live PCM streaming** (audio transcribed while the user speaks), `transcript_final` typically lands <150 ms after `audio_end`, and the first `assistant_audio` ~0.6–1.2 s later. With end-of-turn uploads add the upload + transcription time; with batch fallback add 0.8–2 s. See [AI Pipeline](06-ai-pipeline.md) for the full budget.
+
+## Group rooms — multi-agent (`/v1/group-sessions/:id/live`)
+
+Same transport and handshake, extended for several AI speakers. Create the
+session with [`POST /group-sessions`](03-api-reference.md#group-rooms), then
+connect to the returned `ws_path`.
+
+The **server drives the room**: a deterministic beat plan (host opens → an
+agent reacts and hands the floor → learner turn → agents react to what the
+learner actually said → … → host wraps) decides *who* speaks *when*, while
+every line is generated live by that agent's persona against the real
+transcript. Each agent has its own TTS voice (user persona-voice overrides
+apply).
+
+Differences from the 1:1 protocol:
+
+| Direction | Frame | Meaning |
+| --- | --- | --- |
+| ← | `{ "type": "agent_turn_start", "speaker": "Ana", "role": "Scrum lead", "turn": 0 }` | an agent is about to speak |
+| ← | `assistant_delta` / `assistant_audio` / `assistant_text` | as in 1:1, plus `speaker` and `turn` on every frame |
+| ← | `{ "type": "your_turn", "prompt": "Your turn: yesterday, today, blockers.", "turn": 3 }` | the room hands the learner the floor; audio uploads are only accepted while a user turn is open |
+| ← | `{ "type": "room_done" }` | beat plan finished — call `POST /v1/sessions/:id/end` for the feedback report |
+
+Notes:
+
+- `seq` in `assistant_audio` increases **across the whole session** (not per
+  reply), so the client's ordered audio queue never resets between speakers.
+- An empty `transcript_final` re-sends `your_turn` with the same prompt — the
+  learner keeps the floor.
+- Turns persist with a `speaker` column; the feedback worker labels each agent
+  by name in the transcript it grades.

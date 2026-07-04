@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-07-02_
+_Last updated: 2026-07-04_
 
 **Stage: pre-launch.** All MVP capabilities are implemented and tested locally. Items marked 🔑 activate with configuration only.
 
@@ -23,6 +23,7 @@ _Last updated: 2026-07-02_
 | Post-session feedback (queued worker) | ✅ Done | GPT-4o, strict JSON schema, 2 fixes |
 | CEFR assessment (4 answers → estimate) | ✅ Done | Audio never persisted |
 | Drill scoring (`/drills/score`) | ✅ Done | STT + deterministic metrics; zero LLM cost |
+| Group rooms — multi-agent live sessions | ✅ Done | 10 rooms × 3 AI personas with own voices; deterministic beat plan, agents react to the learner's real words |
 | Word-level pronunciation | 🔑 Config-gated | `AZURE_SPEECH_KEY`; degrades gracefully |
 | Writing coach | ✅ Done | Structured rewrite + explained changes |
 | Word bank CRUD | ✅ Done | |
