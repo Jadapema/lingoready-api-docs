@@ -230,6 +230,34 @@ back to generic coaching.
 user to use) makes the feedback verify the word was actually said
 (`word_used: true|false`) and bumps that word's `seen_count` when it was.
 
+## Weakness training
+
+### `POST /training/session`
+Generates a personalized 8-exercise workout from the learner's own session
+mistakes (feedback fixes), unmastered word-bank words, CEFR level and
+profession — "train grammar" drills the grammar THIS learner gets wrong.
+```json
+{ "focus": "grammar" }
+```
+`focus`: `grammar|vocabulary|fluency|pronunciation|auto` (each has its own
+exercise-type mix). Rate-limited 10/hour.
+→ `201 { "id", "focus", "exercises": [{ "type": "fix|blank|order|say", "prompt", "options", "correct_index", "target", "explanation" }] }`
+Exercise content is English; `explanation` comes back in the user's UI
+language. Malformed LLM exercises are dropped server-side; a set under 4
+exercises is rejected so the app can retry.
+- `fix`/`blank`: 3 options, one correct (`correct_index`).
+- `order`: the app scrambles `target` into word chips.
+- `say`: the app records the learner reading `target` and scores it via
+  `POST /drills/score` with `reference_text`.
+
+### `POST /training/:id/complete`
+`{ "correct_count": 6, "duration_seconds": 240 }` — stores the result and logs
+a `kind: "training"` session so workout minutes count toward the streak and
+weekly stats. Idempotent (`already_completed: true` on repeats).
+
+### `GET /training/history`
+Last 10 completed workouts (`id`, `focus`, `correct_count`, `total`, `completed_at`).
+
 ## Progress
 
 ### `GET /progress`
