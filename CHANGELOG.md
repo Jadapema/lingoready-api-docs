@@ -14,6 +14,8 @@
 - Binary audio frames are only accepted while a turn is open — chunks in flight after a server-side turn end can't open stray STT streams.
 
 ### Fixed
+- A turn endpointed while the previous reply was still flushing its TTS chain silently lost its auto-end; the hold timer now waits for the busy turn instead of dropping. Late signals from an already-taken STT stream can no longer touch the next turn's timers.
+- `POST /tts/preview` accepts 2-character texts (the app's dictionary sheet pronounces single words like "go").
 - **Container audio uploads (m4a) returned empty transcripts** whenever Deepgram was configured — Deepgram's live socket can't decode AAC, so every file-mode turn (the app's Expo Go fallback) came back as "Didn't catch that". `streamingStt(mime)` now routes non-PCM uploads to the batch transcriber (both 1:1 and group sockets).
 
 ## [0.9.0] — 2026-07-04
