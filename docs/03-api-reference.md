@@ -211,7 +211,7 @@ bundles a fallback copy for offline/first launch).
 ### `POST /drills/score`
 Scores one drill round with STT + deterministic speech metrics (no LLM cost).
 ```json
-{ "audio_base64": "…", "mime_type": "audio/m4a", "kind": "filler", "reference_text": "optional sentence" }
+{ "audio_base64": "…", "mime_type": "audio/m4a", "kind": "filler", "reference_text": "optional sentence", "target_word": "optional word" }
 ```
 `kind` accepts any drill slug; kinds without a dedicated metric profile fall
 back to generic coaching.
@@ -221,10 +221,14 @@ back to generic coaching.
   "transcript": "…", "wpm": 138, "fillers": 1, "filler_words": ["um"],
   "trail_offs": 0, "duration_seconds": 22,
   "feedback": "1 filler (um). Almost clean.",
+  "word_used": null,
   "pronunciation": { "accuracy": 84, "fluency": 78, "words": [{ "word": "thorough", "accuracy": 61 }] }
 }
 ```
 `pronunciation` is null unless `reference_text` is sent and Azure is configured.
+`target_word` (word-bank rounds — the app sends the word the round asked the
+user to use) makes the feedback verify the word was actually said
+(`word_used: true|false`) and bumps that word's `seen_count` when it was.
 
 ## Progress
 
