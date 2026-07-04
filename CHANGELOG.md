@@ -13,6 +13,9 @@
 - Live turn model default bumped to `gpt-4.1-mini` (better in-character quality at the same latency class).
 - Binary audio frames are only accepted while a turn is open — chunks in flight after a server-side turn end can't open stray STT streams.
 
+### Fixed
+- **Container audio uploads (m4a) returned empty transcripts** whenever Deepgram was configured — Deepgram's live socket can't decode AAC, so every file-mode turn (the app's Expo Go fallback) came back as "Didn't catch that". `streamingStt(mime)` now routes non-PCM uploads to the batch transcriber (both 1:1 and group sockets).
+
 ## [0.9.0] — 2026-07-04
 
 ### Added
