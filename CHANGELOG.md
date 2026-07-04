@@ -1,11 +1,40 @@
 # Changelog — Lingoready API
 
+## [0.10.0] — 2026-07-04
+
+### Added
+- **Server-side semantic turn-taking** (live sessions): Deepgram's endpointer (`speech_final`/`UtteranceEnd` + `vad_events`) now ends the user's turn on the server, debounced by a *semantic hold* — a closed sentence gets ~120 ms, a trailing "and…" waits ~950 ms for the speaker to resume, and any new words cancel the close (`src/lib/turn-taking.ts`). New `turn_ended` event; the reply starts from the already-final transcript with zero extra round trips. `turn_start` accepts `pace` (`fast`/`normal`/`relaxed`) to tune the endpointing window.
+- **Real-time corrections**: every user turn (≥3 words) gets a parallel `LLM_CORRECTION_MODEL` JSON call that flags the single most valuable error — new `correction` WS event (`original`/`corrected`/`note`/`tag`, note in the user's UI language) that never delays the coach's voice. Migration 0009 persists it on the turn row (`turns.correction`).
+- `turn_cancel` client frame: pausing mid-sentence discards the open turn (no transcript, no reply).
+
+### Changed
+- **Barge-in now aborts the in-flight LLM stream** (not just TTS delivery) — unheard tokens stop billing, and only what actually streamed persists as the assistant turn; the aborted reply sends no `assistant_text`.
+- Turn context (scenario, user, history) is **cached in memory per socket** — no DB reads sit between the transcript and the LLM call; user/assistant turns persist asynchronously.
+- Live turn model default bumped to `gpt-4.1-mini` (better in-character quality at the same latency class).
+- Binary audio frames are only accepted while a turn is open — chunks in flight after a server-side turn end can't open stray STT streams.
+
 ## [0.9.0] — 2026-07-04
 
 ### Added
 - **Group rooms are now real multi-agent conversations.** `POST /group-sessions` + WebSocket `/v1/group-sessions/:id/live`: each of the 10 rooms has three AI participants with their own persona, role and TTS voice (user persona-voice overrides apply). A deterministic beat plan guarantees the learner's speaking turns (host opens → agents react and hand the floor → learner → reactions to what the learner **actually said** → host wraps), while every agent line is generated live against the real transcript. Agent frames carry `speaker` + `turn`; `seq` is session-global so client audio queues never reset between speakers. See the [group protocol](/docs/04-websocket-protocol).
 - Migration 0008: `turns.speaker` (which agent spoke) and `sessions.group_room_id`.
 - Group sessions reuse `POST /sessions/:id/end` + `GET /sessions/:id/feedback` — the feedback worker now labels each agent by name in the graded transcript, and `GET /sessions` resolves group titles/emojis from the room catalog.
+
+## [0.8.0] — 2026-07-04
+
+### Added
+- **Full automated test suite** (252 tests): route integration for all 13 route files against a throwaway Postgres (auth/admin guards, zod validation, rate limits, idempotency, RevenueCat webhook signature, plan caps), WebSocket protocol tests (PCM streaming, ordered TTS delivery, barge-in, voice precedence, session caps), BullMQ worker tests with a real Redis round-trip on an isolated queue prefix, and service tests for feedback scoring, usage metering and GDPR maintenance. See [Testing](/docs/10-testing).
+- **App contract tests**: every response consumed by the mobile app is validated against zod mirrors of the app's types (`test/contract/`).
+- **Live smoke scripts** (`npm run smoke`, `scripts/smoke/stt.ts`) for validating prompts/TTS/STT against real providers before releases, and **performance tools**: `npm run perf:http` (autocannon) and `npm run perf:ws` (time-to-first-coach-audio measurement).
+- CI now runs the suite against Postgres+Redis service containers, plus a dedicated job applying all migrations to an empty database and running the catalog seed twice (idempotence check).
+
+### Fixed
+- `SentenceAssembler` silently dropped the text before a decimal number ("The budget is 3." vanished from TTS when the reply contained "3.5 million") — found by the new unit tests.
+- The global error handler collapsed framework 4xx errors (rate-limit 429, payload-too-large 413) into generic 500s and reported them to Sentry as exceptions; they now reach the client with their real status and code.
+- `suggested_words` deduplication against the word bank was case-sensitive in SQL, so a saved "Rollout" didn't block a suggested "rollout" — the bank filled with case-variant duplicates.
+
+### Changed
+- BullMQ queues take their key prefix from `BULLMQ_PREFIX` (default `bull`) so test jobs never reach the dev worker. **Restart the dev worker after pulling.**
 
 ## [0.7.0] — 2026-07-03
 

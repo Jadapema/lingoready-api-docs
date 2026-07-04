@@ -10,7 +10,7 @@ PostgreSQL via Drizzle ORM. Conventions: UUID PKs, `created_at`/`updated_at` eve
 | `subscriptions` | Plan + entitlements | `plan` (free/standard/pro), `provider`, `monthly_minute_cap` (0 = unlimited), `current_period_end` |
 | `scenarios` | Practice catalog | `slug`, `path_slug` + `order_in_path`, `difficulty`, `role_prompt`, `win_conditions[]`, `key_phrases[]`, `coach_name/role/voice` (voice matches the coach's persona), `is_free` |
 | `sessions` | One practice run | `kind` (scenario/drill/group), `mode` (voice/chat), `status` (created→live→processing→done), `duration_seconds` |
-| `turns` | Transcript lines | `role` (user/assistant), `text`, `audio_url` (ephemeral), `ts` |
+| `turns` | Transcript lines | `role` (user/assistant), `speaker` (group agent), `text`, `correction` (JSONB: the real-time fix shown live — `corrected`/`note`/`tag`), `audio_url` (ephemeral), `ts` |
 | `feedback` | Post-session report | `overall_score`, `scores` JSONB, `fixes[]` (said/better/tag/why), `did_well[]`, `suggested_words[]`, `model` |
 | `assessments` | Level checks | `answers[]`, `cefr_estimate`, `breakdown` JSONB, `takeaways[]` |
 | `writing_reviews` | Writing coach history | `channel`, `tone`, `input_text`, `rewrite`, `changes[]`, `score` (original draft, 0–100), `tokens_used` |

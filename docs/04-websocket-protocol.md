@@ -17,20 +17,23 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 
 | # | Direction | Frame | Notes |
 | --- | --- | --- | --- |
-| 0 | → | `{ "type": "turn_start", "mime_type": "audio/pcm;rate=16000" }` | Recommended: send when recording starts. Sets the turn's audio format and pre-opens the STT connection off the critical path |
-| 1 | → | binary frames (≤256 KB each) | Audio chunks. Preferred: raw 16 kHz mono 16-bit PCM streamed **while the user speaks** (the reference app does this) — STT transcribes in real time and `transcript_final` is near-instant after `audio_end`. Container formats (m4a/wav/ogg) uploaded at turn end also work |
+| 0 | → | `{ "type": "turn_start", "mime_type": "audio/pcm;rate=16000", "pace": "normal" }` | Recommended: send when recording starts. Sets the turn's audio format, pre-opens the STT connection off the critical path, and tunes the server's endpointing (`pace`: `fast` 300 ms · `normal` 400 ms · `relaxed` 600 ms of silence) |
+| 1 | → | binary frames (≤256 KB each) | Audio chunks, only accepted **while a turn is open**. Preferred: raw 16 kHz mono 16-bit PCM streamed **while the user speaks** (the reference app does this) — STT transcribes in real time and the server can end the turn itself. Container formats (m4a/wav/ogg) uploaded at turn end also work |
 | 2 | ← | `{ "type": "transcript_partial", "text" }` | Live captions (Deepgram only), repeated |
-| 3 | → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | Closes the user's turn |
+| 3a | ← | `{ "type": "turn_ended" }` | **Server-side turn end** (live streaming only): the STT endpointer heard the user finish and a *semantic hold* confirmed it — a closed sentence ends the turn in ~120 ms extra, a trailing "and…" waits ~950 ms for the speaker to resume (new words cancel the close). The client must stop treating the turn as open and skip its own `audio_end`; the reply is already being generated. This is the fastest path: no client silence timer, no `audio_end` round trip, no STT close wait |
+| 3b | → | `{ "type": "audio_end", "mime_type": "audio/m4a" }` | Client-side close — the fallback when `turn_ended` didn't fire (client VAD timeout, file uploads, batch STT). After a `turn_ended`, the server swallows exactly one stale `audio_end` so a racing client fallback can't double-close |
 | 4 | ← | `{ "type": "transcript_final", "text" }` | Empty text = nothing intelligible; turn aborts quietly |
 | 5 | ← | `{ "type": "assistant_delta", "text" }` | LLM tokens, repeated — render as "coach is speaking" |
 | 6 | ← | `{ "type": "assistant_audio", "seq": n, "last": bool, "audio_base64", "mime_type": "audio/mpeg", "text": "…" }` | One frame **per clause/sentence**, ordered by `seq`; sentences synthesize in parallel server-side but always arrive in order. `text` carries the sentence being spoken so the client can grow captions in sync with the voice. An empty `audio_base64` means that `seq` was skipped (failed synth or end-marker) — advance past it |
-| 7 | ← | `{ "type": "assistant_text", "text" }` | Full reply; turn is closed and persisted |
+| 7 | ← | `{ "type": "assistant_text", "text" }` | Full reply; turn is closed and persisted. Not sent when the reply was barged-in (the client already moved on) |
+| ∥ | ← | `{ "type": "correction", "original", "corrected", "note", "tag" }` | **Real-time correction** of the user's utterance, generated in parallel with the reply (never delays the voice). `note` is written in the user's UI language; `tag` ∈ `grammar · vocabulary · tense · word-order · phrasing`. Only clear, high-value errors fire; also persisted on the user's turn row |
 
 ## Control frames
 
 | Direction | Frame | Meaning |
 | --- | --- | --- |
-| → | `{ "type": "barge_in" }` | User interrupted playback — server stops queuing TTS for the current reply; client should also flush its local audio queue |
+| → | `{ "type": "barge_in" }` | User interrupted playback — server stops queuing TTS **and aborts the in-flight LLM stream**; whatever text already streamed persists as the assistant turn. Client should also flush its local audio queue |
+| → | `{ "type": "turn_cancel" }` | Discard the open turn entirely (the user paused mid-sentence): no transcript, no reply, STT stream closed |
 | → | `{ "type": "end" }` | Graceful close |
 | ← | `{ "type": "session_cap_reached" }` | Hard per-session cap hit; socket closes after |
 | ← | `{ "type": "error", "code", "message" }` | `rate_limited` (>10 turns/min — recoverable) · `unauthorized` · `not_found` · `internal` (fatal) |
@@ -46,7 +49,7 @@ Binary frames before auth are dropped. Invalid token → `{ type: "error", code:
 
 ## Timing expectations
 
-With Deepgram configured **and live PCM streaming** (audio transcribed while the user speaks), `transcript_final` typically lands <150 ms after `audio_end`, and the first `assistant_audio` ~0.6–1.2 s later. With end-of-turn uploads add the upload + transcription time; with batch fallback add 0.8–2 s. See [AI Pipeline](06-ai-pipeline.md) for the full budget.
+With Deepgram configured **and live PCM streaming**, the server ends the turn itself (`turn_ended`) ~420–550 ms after the user's last word for a finished sentence (300–400 ms endpointing + ~120 ms semantic hold), and the reply starts immediately from the already-final transcript — no `audio_end` hop, no STT close wait. Turn context (scenario/user/history) is cached in memory per socket, so nothing sits between the transcript and the LLM call; the first `assistant_audio` typically lands ~0.7–1.3 s after the user stops talking. With client-side `audio_end` closes add the round trip + STT finalization; with batch fallback add 0.8–2 s. See [AI Pipeline](06-ai-pipeline.md) for the full budget.
 
 ## Group rooms — multi-agent (`/v1/group-sessions/:id/live`)
 

@@ -6,7 +6,8 @@ The pipeline **is** the product. This page covers model routing, the latency bud
 
 | Stage | Model | Why | Runs |
 | --- | --- | --- | --- |
-| Live turns | `gpt-4o-mini` (streaming) | Cheap + fast; in-character quality is sufficient | Every turn |
+| Live turns | `gpt-4.1-mini` (streaming) | Fast with clearly better in-character quality than 4o-mini | Every turn |
+| Live corrections | `gpt-4.1-mini` (JSON) | Tiny per-turn call, runs in parallel with the reply | Every user turn ≥3 words |
 | Post-session feedback | `gpt-4o` | The high-value output; accuracy matters | Once per session |
 | Assessment scoring | `gpt-4o` | First impression must be right | Once per assessment |
 | Writing coach | `gpt-4o-mini` | Stateless, structured output | Per request |
@@ -15,21 +16,22 @@ The pipeline **is** the product. This page covers model routing, the latency bud
 | TTS | `gpt-4o-mini-tts` | ~$0.015/min audio | Per sentence |
 | Pronunciation | Azure Pronunciation Assessment | Purpose-built phoneme scoring | On reference-text drills |
 
-All model ids are env-configurable (`LLM_TURN_MODEL`, `LLM_FEEDBACK_MODEL`, `TTS_MODEL`, `STT_BATCH_MODEL`); every provider sits behind an adapter interface — swapping vendors touches one file.
+All model ids are env-configurable (`LLM_TURN_MODEL`, `LLM_CORRECTION_MODEL`, `LLM_FEEDBACK_MODEL`, `TTS_MODEL`, `STT_BATCH_MODEL`); every provider sits behind an adapter interface — swapping vendors touches one file.
 
 ## Turn latency budget (voice → voice)
 
-Target: **first coach audio ≤ 1.5 s** after the user stops speaking.
+Target: **first coach audio ≤ 1.5 s** after the user stops speaking — including the time spent *deciding the user finished*.
 
 | Segment | With Deepgram (streaming) | Batch fallback |
 | --- | --- | --- |
-| STT final transcript | ~150–300 ms (already streamed) | 800–2000 ms (upload + transcribe) |
-| LLM first sentence (streamed) | 300–600 ms | 300–600 ms |
+| Turn-end decision | ~420–550 ms **server-side** (endpointing 300–400 ms + semantic hold ~120 ms on a closed sentence; no client round trip) | client VAD timer (700–1500 ms) + upload |
+| STT final transcript | 0 ms (already final at `turn_ended`) | 800–2000 ms (upload + transcribe) |
+| LLM first sentence (streamed) | 300–600 ms (context cached in memory — zero DB reads on this path) | 300–600 ms |
 | TTS first sentence | 300–500 ms | 300–500 ms |
 | Network + playback start | ~150 ms | ~150 ms |
-| **First audio heard** | **≈ 0.9–1.5 s** | **≈ 1.6–3.2 s** |
+| **First audio heard** | **≈ 1.2–1.8 s from the last word** (≈ 0.7–1.3 s from "turn decided") | **≈ 2.5–4 s** |
 
-Levers already implemented: sentence-level TTS (don't wait for the full reply), token streaming, windowed history (last 12 turns → flat prompt size), turn model kept small. Next levers on the [roadmap](../ROADMAP.md): server-side VAD endpointing, TTS warm cache for recurrent coach phrases, provider prompt caching, region co-location.
+Levers already implemented: **server-side semantic endpointing** (Deepgram `speech_final`/`UtteranceEnd` + a text-aware hold — a trailing "and…" gets ~950 ms to resume, a closed sentence ~120 ms; see `src/lib/turn-taking.ts`), per-socket turn-context cache (scenario/user/history in memory, persistence async), barge-in aborts the in-flight LLM stream, sentence-level TTS, token streaming, windowed history. Next levers on the [roadmap](../ROADMAP.md): TTS warm cache for recurrent coach phrases, provider prompt caching, region co-location.
 
 ## Prompt architecture (prompts are versioned code)
 
@@ -56,7 +58,7 @@ Approximate unit economics (per 10-min voice session, cascaded pipeline):
 | Feedback (gpt-4o, once) | ~$0.02 |
 | **Total** | **≈ $0.17 / session** → ~$3.40/mo for a daily-10-min user |
 
-Controls in code: hard per-session seconds cap → WS closes · monthly minutes per plan enforced at session creation · 10 turns/min rate limit · history windowing · per-call cost recorded in `usage_events` (powers the daily-spend alert, the first alert to wire in production).
+Controls in code: hard per-session seconds cap → WS closes · monthly minutes per plan enforced at session creation · 10 turns/min rate limit · history windowing · corrections skipped for turns under 3 words · barge-in aborts the LLM request (no tokens billed for unheard text) · per-call cost recorded in `usage_events` (powers the daily-spend alert, the first alert to wire in production).
 
 ## Quality gate
 

@@ -34,6 +34,7 @@ export default defineConfig({
         text: 'Operate',
         items: [
           { text: 'Setup', link: '/docs/07-setup' },
+          { text: 'Testing', link: '/docs/10-testing' },
           { text: 'Deployment & Runbooks', link: '/docs/08-deployment-operations' },
           { text: 'Security & Privacy', link: '/docs/09-security-privacy' },
         ],
